@@ -40,6 +40,8 @@ const formData = reactive({
 });
 
 let animationFrameId = null;
+let isDragging = false;
+let lastPointer = { x: 0, y: 0 };
 
 const openGenerationModal = () => {
   showGenerationModal.value = true;
@@ -178,6 +180,46 @@ const handleWheel = (event) => {
   settings.camera.scale = newScale;
 };
 
+const handlePointerDown = (event) => {
+  if (!event.metaKey) return;
+
+  if (event.button && event.button !== 0 && event.pointerType === 'mouse') return;
+
+  isDragging = true;
+
+  lastPointer.x = event.clientX;
+  lastPointer.y = event.clientY;
+
+  try {
+    mapElem.value?.setPointerCapture?.(event.pointerId);
+  } catch (e) {}
+
+  event.preventDefault();
+};
+
+const handlePointerMove = (event) => {
+  if (!isDragging) return;
+
+  const dx = event.clientX - lastPointer.x;
+  const dy = event.clientY - lastPointer.y;
+
+  settings.camera.x -= dx;
+  settings.camera.y -= dy;
+
+  lastPointer.x = event.clientX;
+  lastPointer.y = event.clientY;
+};
+
+const handlePointerUp = (event) => {
+  if (!isDragging) return;
+
+  isDragging = false;
+
+  try {
+    mapElem.value?.releasePointerCapture?.(event.pointerId);
+  } catch (e) {}
+};
+
 const gameLoop = () => {
   updateCamera();
   animationFrameId = requestAnimationFrame(gameLoop);
@@ -189,6 +231,10 @@ onMounted(() => {
 
   mapElem.value?.addEventListener('wheel', handleWheel, { passive: false });
 
+  mapElem.value?.addEventListener('pointerdown', handlePointerDown);
+  window.addEventListener('pointermove', handlePointerMove);
+  window.addEventListener('pointerup', handlePointerUp);
+
   gameLoop();
 });
 
@@ -197,6 +243,10 @@ onUnmounted(() => {
   window.removeEventListener('keyup', handleKeyUp);
 
   mapElem.value?.removeEventListener('wheel', handleWheel);
+
+  mapElem.value?.removeEventListener('pointerdown', handlePointerDown);
+  window.removeEventListener('pointermove', handlePointerMove);
+  window.removeEventListener('pointerup', handlePointerUp);
 
   cancelAnimationFrame(animationFrameId);
 });
