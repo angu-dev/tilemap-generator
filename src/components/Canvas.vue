@@ -54,17 +54,22 @@ const drawPixels = () => {
   ctx.strokeStyle = 'rgba(255,255,255,0.1)';
   ctx.lineWidth = 1;
 
-  for (let x = 0; x <= canvas.width; x += 2 * props.settings.camera.scale) {
+  const step = 2 * props.settings.camera.scale;
+
+  const offsetX = ((props.settings.camera.x % step) + step) % step;
+  const offsetY = ((props.settings.camera.y % step) + step) % step;
+
+  for (let x = -offsetX; x <= canvas.width; x += step) {
     ctx.beginPath();
-    ctx.moveTo(x + 0.5, 0);
-    ctx.lineTo(x + 0.5, canvas.height);
+    ctx.moveTo(Math.round(x) + 0.5, 0);
+    ctx.lineTo(Math.round(x) + 0.5, canvas.height);
     ctx.stroke();
   }
 
-  for (let y = 0; y <= canvas.height; y += 2 * props.settings.camera.scale) {
+  for (let y = -offsetY; y <= canvas.height; y += step) {
     ctx.beginPath();
-    ctx.moveTo(0, y + 0.5);
-    ctx.lineTo(canvas.width, y + 0.5);
+    ctx.moveTo(0, Math.round(y) + 0.5);
+    ctx.lineTo(canvas.width, Math.round(y) + 0.5);
     ctx.stroke();
   }
 };
