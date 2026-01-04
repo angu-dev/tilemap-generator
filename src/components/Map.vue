@@ -14,6 +14,10 @@ const settings = reactive({
   showPixels: true,
   showHitboxes: true,
   scale: 1,
+  camera: {
+    x: 0,
+    y: 0,
+  },
 });
 
 const showGenerationModal = ref(false);
@@ -43,6 +47,39 @@ const handleForm = () => {
   showGenerationModal.value = false;
 };
 
+const handleScale = (up) => {
+  let factor = 0.5;
+
+  if (!up) {
+    factor *= -1;
+  }
+
+  settings.scale += factor;
+
+  if (settings.scale <= 1) {
+    settings.scale = 1;
+  }
+};
+
+const handleCamera = (key) => {
+  let factor = 1;
+
+  switch (key) {
+    case 'up':
+      settings.camera.y -= factor;
+      break;
+    case 'down':
+      settings.camera.y += factor;
+      break;
+    case 'left':
+      settings.camera.x -= factor;
+      break;
+    case 'right':
+      settings.camera.x += factor;
+      break;
+  }
+};
+
 const validateInput = (event) => {
   if (parseInt(event.target.value) >= 1) return;
 
@@ -55,7 +92,7 @@ const validateInput = (event) => {
     <button v-if="!hasCurrentConfig" @click="openGenerationModal">Map erstellen</button>
 
     <template v-else>
-      <ul class="settings">
+      <ul class="config settings">
         <li>
           <input type="checkbox" v-model="settings.showGrid" id="input-show-grid" />
           <label for="input-show-grid">Grid</label>
@@ -69,6 +106,34 @@ const validateInput = (event) => {
         <li>
           <input type="checkbox" v-model="settings.showHitboxes" id="input-show-hitboxes" />
           <label for="input-show-hitboxes">Hitboxes</label>
+        </li>
+      </ul>
+
+      <ul class="config scale">
+        <li>
+          <button @click="handleScale(true)">+</button>
+        </li>
+
+        <li>
+          <button @click="handleScale(false)">-</button>
+        </li>
+      </ul>
+
+      <ul class="config camera">
+        <li>
+          <button @click="handleCamera('up')">U</button>
+        </li>
+
+        <li>
+          <button @click="handleCamera('down')">D</button>
+        </li>
+
+        <li>
+          <button @click="handleCamera('left')">L</button>
+        </li>
+
+        <li>
+          <button @click="handleCamera('right')">R</button>
         </li>
       </ul>
 
@@ -112,25 +177,56 @@ const validateInput = (event) => {
   overflow: hidden;
   position: relative;
 
-  .settings {
+  .config {
     position: absolute;
-    top: 0;
-    right: 0;
     background-color: variables.$dark;
-    color: variables.$light;
+    border: 2px solid variables.$light;
     list-style: none;
     display: flex;
     margin: 0;
     padding: 1rem;
     gap: 1rem;
+
+    button {
+      height: 2rem;
+      width: 2rem;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 2rem;
+      padding: 0;
+      padding-left: 2px;
+      padding-top: 1px;
+    }
+  }
+
+  .settings {
+    top: 0;
+    right: 0;
     border-radius: 0 0 0 1rem;
-    border: 2px solid variables.$light;
     border-top: none;
-    border-right: 0;
+    border-right: none;
+    color: variables.$light;
 
     label {
       margin-right: 0;
     }
+  }
+
+  .scale {
+    border-radius: 1rem 0 0 0;
+    border-bottom: none;
+    border-right: none;
+    bottom: 0;
+    right: 0;
+  }
+
+  .camera {
+    border-radius: 0 1rem 0 0;
+    border-bottom: none;
+    border-left: none;
+    bottom: 0;
+    left: 0;
   }
 }
 
