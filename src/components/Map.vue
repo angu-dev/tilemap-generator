@@ -69,6 +69,13 @@ const validateInput = (event) => {
 };
 
 const updateCamera = () => {
+  const movementFactor = 3;
+
+  if (keys.up) settings.camera.y -= movementFactor;
+  if (keys.down) settings.camera.y += movementFactor;
+  if (keys.left) settings.camera.x -= movementFactor;
+  if (keys.right) settings.camera.x += movementFactor;
+
   if (keys.plus || keys.minus) {
     const rect = mapElem.value?.getBoundingClientRect() ?? { width: 0, height: 0 };
     const centerX = rect.width / 2;
