@@ -69,31 +69,20 @@ const validateInput = (event) => {
 };
 
 const updateCamera = () => {
-  const movementFactor = 3;
-  const scaleFactor = 0.01;
-
-  if (keys.up) settings.camera.y -= movementFactor;
-  if (keys.down) settings.camera.y += movementFactor;
-  if (keys.left) settings.camera.x -= movementFactor;
-  if (keys.right) settings.camera.x += movementFactor;
-
   if (keys.plus || keys.minus) {
     const rect = mapElem.value?.getBoundingClientRect() ?? { width: 0, height: 0 };
     const centerX = rect.width / 2;
     const centerY = rect.height / 2;
 
     const oldScale = settings.camera.scale;
-    const factor = keys.plus ? 1 + scaleFactor : 1 - scaleFactor;
-    const newScale = Math.max(1, oldScale * factor);
-    const f = newScale / oldScale;
+    const factor = keys.plus ? 1.01 : 0.99;
+    const newScale = Math.min(10, Math.max(1, oldScale * factor));
 
+    const f = newScale / oldScale;
     settings.camera.x = settings.camera.x * f + centerX * (f - 1);
     settings.camera.y = settings.camera.y * f + centerY * (f - 1);
-    settings.camera.scale = newScale;
-  }
 
-  if (settings.camera.scale <= 1) {
-    settings.camera.scale = 1;
+    settings.camera.scale = newScale;
   }
 };
 
@@ -171,11 +160,13 @@ const handleWheel = (event) => {
   const factor = 1 + delta * zoomSpeed;
 
   const oldScale = settings.camera.scale;
-  const newScale = Math.max(1, oldScale * factor);
-  const f = newScale / oldScale;
+  const newScale = Math.min(10, Math.max(1, oldScale * factor));
 
-  settings.camera.x = settings.camera.x * f + mouseX * (f - 1);
-  settings.camera.y = settings.camera.y * f + mouseY * (f - 1);
+  if (Math.abs(newScale - oldScale) > 1e-9) {
+    const f = newScale / oldScale;
+    settings.camera.x = settings.camera.x * f + mouseX * (f - 1);
+    settings.camera.y = settings.camera.y * f + mouseY * (f - 1);
+  }
 
   settings.camera.scale = newScale;
 };
