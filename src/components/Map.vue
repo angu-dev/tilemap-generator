@@ -1,5 +1,5 @@
 <script setup>
-import { reactive, ref, useTemplateRef } from 'vue';
+import { onMounted, onUnmounted, reactive, ref, useTemplateRef } from 'vue';
 import Modal from './Modal.vue';
 import { useConfigStore } from '@/stores/configs';
 import { storeToRefs } from 'pinia';
@@ -13,11 +13,20 @@ const settings = reactive({
   showGrid: true,
   showPixels: true,
   showHitboxes: true,
-  scale: 1,
   camera: {
     x: 0,
     y: 0,
+    scale: 1,
   },
+});
+
+const keys = reactive({
+  up: false,
+  down: false,
+  left: false,
+  right: false,
+  plus: false,
+  minus: false,
 });
 
 const showGenerationModal = ref(false);
@@ -27,6 +36,8 @@ const formData = reactive({
   x: 16,
   y: 16,
 });
+
+let animationFrameId = null;
 
 const openGenerationModal = () => {
   showGenerationModal.value = true;
@@ -47,44 +58,106 @@ const handleForm = () => {
   showGenerationModal.value = false;
 };
 
-const handleScale = (up) => {
-  let factor = 0.5;
-
-  if (!up) {
-    factor *= -1;
-  }
-
-  settings.scale += factor;
-
-  if (settings.scale <= 1) {
-    settings.scale = 1;
-  }
-};
-
-const handleCamera = (key) => {
-  let factor = 1;
-
-  switch (key) {
-    case 'up':
-      settings.camera.y -= factor;
-      break;
-    case 'down':
-      settings.camera.y += factor;
-      break;
-    case 'left':
-      settings.camera.x -= factor;
-      break;
-    case 'right':
-      settings.camera.x += factor;
-      break;
-  }
-};
-
 const validateInput = (event) => {
   if (parseInt(event.target.value) >= 1) return;
 
   event.target.value = 1;
 };
+
+const updateCamera = () => {
+  const movementFactor = 3;
+  const scaleFactor = 0.01;
+
+  if (keys.up) settings.camera.y -= movementFactor;
+  if (keys.down) settings.camera.y += movementFactor;
+  if (keys.left) settings.camera.x -= movementFactor;
+  if (keys.right) settings.camera.x += movementFactor;
+  if (keys.plus) settings.camera.scale += scaleFactor;
+  if (keys.minus) settings.camera.scale -= scaleFactor;
+
+  if (settings.camera.scale <= 1) {
+    settings.camera.scale = 1;
+  }
+};
+
+const handleMouseDown = (direction) => {
+  keys[direction] = true;
+  updateCamera();
+};
+
+const handleMouseUp = (direction) => {
+  keys[direction] = false;
+  updateCamera();
+};
+
+const handleKeyDown = (event) => {
+  switch (event.code) {
+    case 'ArrowUp':
+      keys.up = true;
+      event.preventDefault();
+      break;
+    case 'ArrowDown':
+      keys.down = true;
+      event.preventDefault();
+      break;
+    case 'ArrowLeft':
+      keys.left = true;
+      event.preventDefault();
+      break;
+    case 'ArrowRight':
+      keys.right = true;
+      event.preventDefault();
+      break;
+    case 'BracketRight':
+      keys.plus = true;
+      event.preventDefault();
+      break;
+    case 'Slash':
+      keys.minus = true;
+      event.preventDefault();
+      break;
+  }
+};
+
+const handleKeyUp = (event) => {
+  switch (event.code) {
+    case 'ArrowUp':
+      keys.up = false;
+      break;
+    case 'ArrowDown':
+      keys.down = false;
+      break;
+    case 'ArrowLeft':
+      keys.left = false;
+      break;
+    case 'ArrowRight':
+      keys.right = false;
+      break;
+    case 'BracketRight':
+      keys.plus = false;
+      break;
+    case 'Slash':
+      keys.minus = false;
+      break;
+  }
+};
+
+const gameLoop = () => {
+  updateCamera();
+  animationFrameId = requestAnimationFrame(gameLoop);
+};
+
+onMounted(() => {
+  window.addEventListener('keydown', handleKeyDown);
+  window.addEventListener('keyup', handleKeyUp);
+  gameLoop();
+});
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeyDown);
+  window.removeEventListener('keyup', handleKeyUp);
+  cancelAnimationFrame(animationFrameId);
+});
 </script>
 
 <template>
@@ -111,29 +184,29 @@ const validateInput = (event) => {
 
       <ul class="config scale">
         <li>
-          <button @click="handleScale(true)">+</button>
+          <button @mousedown="handleMouseDown('plus')" @mouseup="handleMouseUp('plus')" @mouseleave="handleMouseUp('plus')">+</button>
         </li>
 
         <li>
-          <button @click="handleScale(false)">-</button>
+          <button @mousedown="handleMouseDown('minus')" @mouseup="handleMouseUp('minus')" @mouseleave="handleMouseUp('minus')">-</button>
         </li>
       </ul>
 
       <ul class="config camera">
         <li>
-          <button @click="handleCamera('up')">U</button>
+          <button @mousedown="handleMouseDown('up')" @mouseup="handleMouseUp('up')" @mouseleave="handleMouseUp('up')">U</button>
         </li>
 
         <li>
-          <button @click="handleCamera('down')">D</button>
+          <button @mousedown="handleMouseDown('down')" @mouseup="handleMouseUp('down')" @mouseleave="handleMouseUp('down')">D</button>
         </li>
 
         <li>
-          <button @click="handleCamera('left')">L</button>
+          <button @mousedown="handleMouseDown('left')" @mouseup="handleMouseUp('left')" @mouseleave="handleMouseUp('left')">L</button>
         </li>
 
         <li>
-          <button @click="handleCamera('right')">R</button>
+          <button @mousedown="handleMouseDown('right')" @mouseup="handleMouseUp('right')" @mouseleave="handleMouseUp('right')">R</button>
         </li>
       </ul>
 
