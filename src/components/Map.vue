@@ -7,6 +7,8 @@ import Canvas from './Canvas.vue';
 
 const configs = useConfigStore();
 
+const mapElem = useTemplateRef('map-el');
+
 const { hasCurrentConfig } = storeToRefs(configs);
 
 const settings = reactive({
@@ -72,8 +74,21 @@ const updateCamera = () => {
   if (keys.down) settings.camera.y += movementFactor;
   if (keys.left) settings.camera.x -= movementFactor;
   if (keys.right) settings.camera.x += movementFactor;
-  if (keys.plus) settings.camera.scale += scaleFactor;
-  if (keys.minus) settings.camera.scale -= scaleFactor;
+
+  if (keys.plus || keys.minus) {
+    const rect = mapElem.value?.getBoundingClientRect() ?? { width: 0, height: 0 };
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+
+    const oldScale = settings.camera.scale;
+    const factor = keys.plus ? 1 + scaleFactor : 1 - scaleFactor;
+    const newScale = Math.max(1, oldScale * factor);
+    const f = newScale / oldScale;
+
+    settings.camera.x = settings.camera.x * f + centerX * (f - 1);
+    settings.camera.y = settings.camera.y * f + centerY * (f - 1);
+    settings.camera.scale = newScale;
+  }
 
   if (settings.camera.scale <= 1) {
     settings.camera.scale = 1;
@@ -142,6 +157,27 @@ const handleKeyUp = (event) => {
   }
 };
 
+const handleWheel = (event) => {
+  event.preventDefault();
+
+  const rect = mapElem.value.getBoundingClientRect();
+  const mouseX = event.clientX - rect.left;
+  const mouseY = event.clientY - rect.top;
+
+  const zoomSpeed = 0.0015;
+  const delta = -event.deltaY;
+  const factor = 1 + delta * zoomSpeed;
+
+  const oldScale = settings.camera.scale;
+  const newScale = Math.max(1, oldScale * factor);
+  const f = newScale / oldScale;
+
+  settings.camera.x = settings.camera.x * f + mouseX * (f - 1);
+  settings.camera.y = settings.camera.y * f + mouseY * (f - 1);
+
+  settings.camera.scale = newScale;
+};
+
 const gameLoop = () => {
   updateCamera();
   animationFrameId = requestAnimationFrame(gameLoop);
@@ -150,18 +186,24 @@ const gameLoop = () => {
 onMounted(() => {
   window.addEventListener('keydown', handleKeyDown);
   window.addEventListener('keyup', handleKeyUp);
+
+  mapElem.value?.addEventListener('wheel', handleWheel, { passive: false });
+
   gameLoop();
 });
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeyDown);
   window.removeEventListener('keyup', handleKeyUp);
+
+  mapElem.value?.removeEventListener('wheel', handleWheel);
+
   cancelAnimationFrame(animationFrameId);
 });
 </script>
 
 <template>
-  <div class="map">
+  <div class="map" ref="map-el">
     <button v-if="!hasCurrentConfig" @click="openGenerationModal">Map erstellen</button>
 
     <template v-else>
