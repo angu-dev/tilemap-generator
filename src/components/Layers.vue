@@ -6,7 +6,7 @@ import { onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 
 const configs = useConfigStore();
 
-const { currentConfig } = storeToRefs(configs);
+const { currentConfig, selectedTileId } = storeToRefs(configs);
 
 const createFormData = reactive({
   name: '',
@@ -41,6 +41,7 @@ let draggedIndex = null;
 let targetIndex = null;
 let prevRotation = 0;
 let isPainting = false;
+let paintMode = null;
 
 const openCreateModal = () => {
   showCreateModal.value = true;
@@ -358,18 +359,29 @@ const handleCellDown = (x, y, event) => {
   if (event.button && event.button !== 0) return;
 
   isPainting = true;
-  setCell(x, y, true);
+  const row = addTileFormData.hitboxes[y];
+
+  if (row && typeof row[x] !== 'undefined') {
+    // Bestimme den Mode basierend auf aktuellem Zustand
+    paintMode = row[x] ? 'remove' : 'add';
+    row[x] = !row[x];
+  }
 
   event.preventDefault();
 };
 
 const handleCellEnter = (x, y) => {
-  if (!isPainting) return;
-  setCell(x, y, true);
+  if (!isPainting || !paintMode) return;
+
+  const row = addTileFormData.hitboxes[y];
+  if (row && typeof row[x] !== 'undefined') {
+    row[x] = paintMode === 'add';
+  }
 };
 
 const handlePointerUpGlobal = () => {
   isPainting = false;
+  paintMode = null;
 };
 
 onMounted(() => {
@@ -384,6 +396,10 @@ const getTileById = (tileId) => {
   return currentConfig.value.tiles?.find((t) => t.id === tileId);
 };
 
+const selectTile = (tileId) => {
+  selectedTileId.value = selectedTileId.value === tileId ? null : tileId;
+};
+
 const deleteTile = (layerName, tileId) => {
   if (!confirm('Tile wirklich löschen?')) {
     return;
@@ -395,6 +411,10 @@ const deleteTile = (layerName, tileId) => {
   }
 
   currentConfig.value.tiles = currentConfig.value.tiles.filter((t) => t.id !== tileId);
+
+  if (selectedTileId.value === tileId) {
+    selectedTileId.value = null;
+  }
 
   configs.update();
 };
@@ -428,7 +448,7 @@ const deleteTile = (layerName, tileId) => {
         </div>
 
         <ul v-if="layer.tileIds" class="tiles-list">
-          <li v-for="tileId in layer.tileIds" :key="tileId" class="tile-item">
+          <li v-for="tileId in layer.tileIds" :key="tileId" class="tile-item" :class="{ active: selectedTileId === tileId }" @click="selectTile(tileId)">
             <div v-if="getTileById(tileId)">
               <img v-if="getTileById(tileId).src" :src="getTileById(tileId).src" alt="tile preview" class="tile-preview" />
               {{ getTileById(tileId).fileName }}
@@ -606,6 +626,9 @@ ul.layer-list {
       list-style: none;
       margin-top: 0.5rem;
       width: 100%;
+      gap: 0.5rem;
+      display: flex;
+      flex-direction: column;
 
       li {
         background-color: variables.$light;
@@ -614,6 +637,10 @@ ul.layer-list {
         display: flex;
         justify-content: space-between;
         align-items: center;
+
+        &.active {
+          background-color: rgba(0, 150, 255, 0.7);
+        }
 
         > div {
           display: flex;
@@ -662,7 +689,8 @@ ul.layer-list {
 
 :deep(.tile-grid) {
   position: relative;
-  width: 50%;
+  max-width: 50%;
+  max-height: 300px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   margin: 1rem 0;
   overflow: hidden;
@@ -674,6 +702,7 @@ ul.layer-list {
     background-repeat: no-repeat;
     background-position: center;
     transform-origin: center center;
+    image-rendering: pixelated;
   }
 
   .overlay {

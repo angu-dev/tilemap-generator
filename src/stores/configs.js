@@ -8,6 +8,7 @@ export const useConfigStore = defineStore('config', () => {
 
   const currentConfigName = ref(null);
   const changedCurrentConfig = ref(false);
+  const selectedTileId = ref(null);
 
   const init = () => {
     const storage = localStorage.getItem(KEY_CONFIGS);
@@ -120,5 +121,6 @@ export const useConfigStore = defineStore('config', () => {
     hasCurrentConfig,
     hasCurrentConfigChanges,
     currentConfig,
+    selectedTileId,
   };
 });

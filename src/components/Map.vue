@@ -7,6 +7,8 @@ import Canvas from './Canvas.vue';
 
 const configs = useConfigStore();
 
+const { selectedTileId } = storeToRefs(configs);
+
 const mapElem = useTemplateRef('map-el');
 
 const { hasCurrentConfig } = storeToRefs(configs);
@@ -167,15 +169,21 @@ const handleWheel = (event) => {
   const factor = 1 + delta * zoomSpeed;
 
   const oldScale = settings.camera.scale;
-  const newScale = Math.min(10, Math.max(1, oldScale * factor));
+  let newScale = oldScale * factor;
+  newScale = Math.min(10, Math.max(1, newScale));
 
   if (Math.abs(newScale - oldScale) > 1e-9) {
-    const f = newScale / oldScale;
-    settings.camera.x = settings.camera.x * f + mouseX * (f - 1);
-    settings.camera.y = settings.camera.y * f + mouseY * (f - 1);
-  }
+    // Maus-Position in World-Koordinaten
+    const worldMouseX = mouseX / oldScale + settings.camera.x;
+    const worldMouseY = mouseY / oldScale + settings.camera.y;
 
-  settings.camera.scale = newScale;
+    // Neue Scale setzen
+    settings.camera.scale = newScale;
+
+    // Camera so anpassen, dass die World-Position unter der Maus gleich bleibt
+    settings.camera.x = worldMouseX - mouseX / newScale;
+    settings.camera.y = worldMouseY - mouseY / newScale;
+  }
 };
 
 const handlePointerDown = (event) => {
@@ -300,7 +308,7 @@ onUnmounted(() => {
         </li>
       </ul>
 
-      <Canvas :settings />
+      <Canvas :settings :selectedTileId />
     </template>
   </div>
 
