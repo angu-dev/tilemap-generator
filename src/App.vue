@@ -59,6 +59,24 @@ onMounted(() => {
     border: 2px solid variables.$light;
     border-radius: 1rem;
     padding: 1rem;
+
+    h2 {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+
+      button {
+        height: 2rem;
+        width: 2rem;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 2rem;
+        padding: 0;
+        padding-left: 2px;
+        padding-top: 1px;
+      }
+    }
   }
 }
 </style>

@@ -78,7 +78,13 @@ const handleImportConfigForm = () => {
 
       const REQUIRED_CONFIG_KEYS = ['name', 'x', 'y'];
       const hasAllKeys = REQUIRED_CONFIG_KEYS.every((key) => key in jsonData);
-      const hasCorrectTypes = typeof jsonData.name === 'string' && typeof jsonData.x === 'number' && typeof jsonData.y === 'number';
+      const hasCorrectTypes =
+        typeof jsonData.name === 'string' &&
+        typeof jsonData.x === 'number' &&
+        typeof jsonData.y === 'number' &&
+        Array.isArray(jsonData.tiles) &&
+        Array.isArray(jsonData.layers) &&
+        Array.isArray(jsonData.areas);
 
       if (!hasAllKeys || !hasCorrectTypes) {
         throw Error();

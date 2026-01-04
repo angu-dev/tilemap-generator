@@ -26,7 +26,7 @@ export const useConfigStore = defineStore('config', () => {
   };
 
   const add = (name, x, y) => {
-    configs.push({ name, x, y });
+    configs.push({ name, x, y, tiles: [], layers: [], areas: [] });
     currentConfigName.value = name;
     changedCurrentConfig.value = true;
   };

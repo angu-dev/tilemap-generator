@@ -1,5 +1,9 @@
 <template>
   <div class="areas">
-    <h2>Areas</h2>
+    <h2>
+      Areas
+
+      <button>+</button>
+    </h2>
   </div>
 </template>
