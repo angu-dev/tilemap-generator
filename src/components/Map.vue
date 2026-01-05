@@ -220,8 +220,9 @@ const handlePointerMove = (event) => {
   const dx = event.clientX - lastPointer.x;
   const dy = event.clientY - lastPointer.y;
 
-  settings.camera.x -= dx;
-  settings.camera.y -= dy;
+  const scale = settings.camera.scale || 1;
+  settings.camera.x -= dx / scale;
+  settings.camera.y -= dy / scale;
 
   lastPointer.x = event.clientX;
   lastPointer.y = event.clientY;
