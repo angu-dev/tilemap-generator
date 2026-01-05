@@ -94,14 +94,16 @@ const drawTilePreview = () => {
   if (props.settings.showHitboxes && tile.hitboxes) {
     const cellW = dw / tile.width;
     const cellH = dh / tile.height;
-    ctx.strokeStyle = 'rgba(255, 0, 0, 0.6)';
-    ctx.lineWidth = 1;
+    const inset = 0.75; // reduziert Überschneidungen an den Kanten
+    ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
     tile.hitboxes.forEach((row, y) => {
       row.forEach((isHitbox, x) => {
         if (isHitbox) {
           const hx = dx + x * cellW;
           const hy = dy + y * cellH;
-          ctx.strokeRect(Math.floor(hx), Math.floor(hy), Math.ceil(cellW), Math.ceil(cellH));
+          const w = Math.max(0, cellW - inset * 2);
+          const h = Math.max(0, cellH - inset * 2);
+          ctx.fillRect(hx + inset, hy + inset, w, h);
         }
       });
     });
@@ -231,14 +233,16 @@ const drawPlacedTiles = () => {
         if (props.settings.showHitboxes && tile.hitboxes) {
           const cellW = dw / tile.width;
           const cellH = dh / tile.height;
-          ctx.strokeStyle = 'rgba(255, 0, 0, 0.6)';
-          ctx.lineWidth = 1;
+          const inset = 0.75; // reduziert Überschneidungen an den Kanten
+          ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
           tile.hitboxes.forEach((row, y) => {
             row.forEach((isHitbox, x) => {
               if (isHitbox) {
                 const hx = dx + x * cellW;
                 const hy = dy + y * cellH;
-                ctx.strokeRect(Math.floor(hx), Math.floor(hy), Math.ceil(cellW), Math.ceil(cellH));
+                const w = Math.max(0, cellW - inset * 2);
+                const h = Math.max(0, cellH - inset * 2);
+                ctx.fillRect(hx + inset, hy + inset, w, h);
               }
             });
           });
