@@ -190,67 +190,66 @@ const drawPixels = () => {
 };
 
 const drawPlacedTiles = () => {
-  if (!currentConfig.value.tiles) return;
+  const cfg = currentConfig.value;
+  if (!cfg?.layers?.length || !cfg?.tiles?.length) return;
 
-  currentConfig.value.tiles.forEach((tile) => {
-    if (!tile.src || !tile.positions || tile.positions.length === 0) return;
+  for (const layer of cfg.layers) {
+    if (layer.hidden) continue;
+    if (!layer.tileIds?.length) continue;
 
-    // Skip wenn das Tile selbst hidden ist
-    if (tile.hidden) return;
+    for (const tileId of layer.tileIds) {
+      const tile = cfg.tiles.find((t) => t.id === tileId);
+      if (!tile || tile.hidden) continue;
+      if (!tile.src || !tile.positions || tile.positions.length === 0) continue;
 
-    // Prüfe ob der Tile in einem hidden Layer ist
-    const tileLayer = currentConfig.value.layers?.find((layer) => layer.tileIds?.includes(tile.id));
+      const img = getOrLoadImage(tile.src);
+      if (!img.complete) continue;
 
-    if (tileLayer?.hidden) return; // Skip wenn Layer hidden ist
+      tile.positions.forEach((pos) => {
+        const tileWidth = Math.floor(tile.width * props.settings.camera.scale * 2);
+        const tileHeight = Math.floor(tile.height * props.settings.camera.scale * 2);
 
-    const img = getOrLoadImage(tile.src);
-    if (!img.complete) return;
+        const screenX = Math.floor((pos.x - props.settings.camera.x) * props.settings.camera.scale);
+        const screenY = Math.floor((pos.y - props.settings.camera.y) * props.settings.camera.scale);
 
-    tile.positions.forEach((pos) => {
-      const tileWidth = Math.floor(tile.width * props.settings.camera.scale * 2);
-      const tileHeight = Math.floor(tile.height * props.settings.camera.scale * 2);
+        ctx.save();
 
-      const screenX = Math.floor((pos.x - props.settings.camera.x) * props.settings.camera.scale);
-      const screenY = Math.floor((pos.y - props.settings.camera.y) * props.settings.camera.scale);
+        const centerX = screenX + tileWidth / 2;
+        const centerY = screenY + tileHeight / 2;
+        ctx.translate(centerX, centerY);
 
-      ctx.save();
+        if (tile.rotation) {
+          ctx.rotate((tile.rotation * Math.PI) / 180);
+        }
 
-      const centerX = screenX + tileWidth / 2;
-      const centerY = screenY + tileHeight / 2;
-      ctx.translate(centerX, centerY);
+        const scaleX = tile.mirrored?.x ? -1 : 1;
+        const scaleY = tile.mirrored?.y ? -1 : 1;
+        ctx.scale(scaleX, scaleY);
 
-      if (tile.rotation) {
-        ctx.rotate((tile.rotation * Math.PI) / 180);
-      }
+        ctx.drawImage(img, -tileWidth / 2, -tileHeight / 2, tileWidth, tileHeight);
 
-      const scaleX = tile.mirrored?.x ? -1 : 1;
-      const scaleY = tile.mirrored?.y ? -1 : 1;
-      ctx.scale(scaleX, scaleY);
+        if (props.settings.showHitboxes && tile.hitboxes) {
+          const cellWidth = tileWidth / tile.width;
+          const cellHeight = tileHeight / tile.height;
 
-      ctx.drawImage(img, -tileWidth / 2, -tileHeight / 2, tileWidth, tileHeight);
+          ctx.strokeStyle = 'rgba(255, 0, 0, 0.6)';
+          ctx.lineWidth = 1;
 
-      // Zeichne Hitboxes
-      if (props.settings.showHitboxes && tile.hitboxes) {
-        const cellWidth = tileWidth / tile.width;
-        const cellHeight = tileHeight / tile.height;
-
-        ctx.strokeStyle = 'rgba(255, 0, 0, 0.6)';
-        ctx.lineWidth = 1;
-
-        tile.hitboxes.forEach((row, y) => {
-          row.forEach((isHitbox, x) => {
-            if (isHitbox) {
-              const hx = -tileWidth / 2 + x * cellWidth;
-              const hy = -tileHeight / 2 + y * cellHeight;
-              ctx.strokeRect(hx, hy, cellWidth, cellHeight);
-            }
+          tile.hitboxes.forEach((row, y) => {
+            row.forEach((isHitbox, x) => {
+              if (isHitbox) {
+                const hx = -tileWidth / 2 + x * cellWidth;
+                const hy = -tileHeight / 2 + y * cellHeight;
+                ctx.strokeRect(hx, hy, cellWidth, cellHeight);
+              }
+            });
           });
-        });
-      }
+        }
 
-      ctx.restore();
-    });
-  });
+        ctx.restore();
+      });
+    }
+  }
 };
 
 const render = () => {
