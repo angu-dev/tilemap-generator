@@ -61,6 +61,109 @@ let paintMode = null;
 let editInitializing = false;
 let isPaintingEdit = false;
 let paintModeEdit = null;
+let draggedTileId = null;
+let draggedTileLayer = null;
+let draggedTileIndex = null;
+
+const handleTileDragStart = (layerName, tileId, event) => {
+  draggedTileId = tileId;
+  draggedTileLayer = layerName;
+  const layer = currentConfig.value.layers.find((l) => l.name === layerName);
+  draggedTileIndex = layer ? layer.tileIds.findIndex((id) => id === tileId) : -1;
+
+  try {
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', tileId);
+  } catch (e) {}
+};
+
+const handleTileDragOverEmpty = (event, layerName) => {
+  event.preventDefault();
+  event.dataTransfer.dropEffect = 'move';
+  if (!draggedTileId) return;
+
+  const targetLayer = currentConfig.value.layers.find((l) => l.name === layerName);
+  if (!targetLayer) return;
+
+  // Nur wenn wirklich leer
+  if (targetLayer.tileIds.length > 0) return;
+
+  let destIdx = 0; // leere Liste: Index 0
+
+  const currentLayer = currentConfig.value.layers.find((l) => l.tileIds.includes(draggedTileId));
+  const srcIdx = currentLayer ? currentLayer.tileIds.indexOf(draggedTileId) : -1;
+  if (currentLayer && srcIdx !== -1) currentLayer.tileIds.splice(srcIdx, 1);
+
+  const existing = targetLayer.tileIds.indexOf(draggedTileId);
+  if (existing !== -1) targetLayer.tileIds.splice(existing, 1);
+
+  targetLayer.tileIds.splice(destIdx, 0, draggedTileId);
+  draggedTileLayer = layerName;
+  draggedTileIndex = destIdx;
+};
+
+const handleTileDropEmpty = (event, layerName) => {
+  event.preventDefault();
+  handleTileDragOverEmpty(event, layerName);
+  draggedTileId = null;
+  draggedTileLayer = null;
+  draggedTileIndex = null;
+  configs.update();
+};
+
+const handleTileDragOver = (event, layerName, hoverIndex) => {
+  event.preventDefault();
+  event.dataTransfer.dropEffect = 'move';
+  if (!draggedTileId) return;
+
+  const targetLayer = currentConfig.value.layers.find((l) => l.name === layerName);
+  if (!targetLayer) return;
+  if (hoverIndex == null) return;
+
+  // Vor/Nach anhand Mausposition
+  const rect = event.currentTarget?.getBoundingClientRect?.();
+  const before = rect ? event.clientY < rect.top + rect.height / 2 : true;
+  let destIdx = before ? hoverIndex : hoverIndex + 1;
+
+  const currentLayer = currentConfig.value.layers.find((l) => l.tileIds.includes(draggedTileId));
+  const srcIdx = currentLayer ? currentLayer.tileIds.indexOf(draggedTileId) : -1;
+
+  // Im selben Layer
+  if (currentLayer === targetLayer && srcIdx !== -1) {
+    // Keine Änderung?
+    if (destIdx === srcIdx || destIdx === srcIdx + 1) return;
+
+    // Entfernen
+    targetLayer.tileIds.splice(srcIdx, 1);
+    // Wenn Quelle vor Ziel lag, Ziel um 1 nach links
+    if (srcIdx < destIdx) destIdx = Math.max(0, destIdx - 1);
+
+    targetLayer.tileIds.splice(destIdx, 0, draggedTileId);
+    draggedTileIndex = destIdx;
+    return;
+  }
+
+  // Cross-Layer: aus Quelle entfernen
+  if (currentLayer && srcIdx !== -1) currentLayer.tileIds.splice(srcIdx, 1);
+
+  // Falls schon im Ziel, zuerst entfernen
+  const existing = targetLayer.tileIds.indexOf(draggedTileId);
+  if (existing !== -1) {
+    targetLayer.tileIds.splice(existing, 1);
+    if (existing < destIdx) destIdx = Math.max(0, destIdx - 1);
+  }
+
+  targetLayer.tileIds.splice(destIdx, 0, draggedTileId);
+  draggedTileLayer = layerName;
+  draggedTileIndex = destIdx;
+};
+
+const handleTileDragEnd = () => {
+  draggedTileId = null;
+  draggedTileLayer = null;
+  draggedTileIndex = null;
+  configs.update();
+};
 
 const handleCellDownEdit = (x, y, event) => {
   if (event.button && event.button !== 0) return;
@@ -642,8 +745,27 @@ watch(
           </div>
         </div>
 
-        <ul v-if="layer.tileIds" class="tiles-list">
-          <li v-for="tileId in layer.tileIds" :key="tileId" class="tile-item" :class="{ active: selectedTileId === tileId }" @click="selectTile(tileId)">
+        <ul
+          v-if="layer.tileIds"
+          class="tiles-list"
+          :class="{ empty: layer.tileIds.length === 0 }"
+          @dragover.prevent.stop="handleTileDragOverEmpty($event, layer.name)"
+          @dragenter.prevent.stop="handleTileDragOverEmpty($event, layer.name)"
+          @drop.prevent.stop="handleTileDropEmpty($event, layer.name)"
+        >
+          <li
+            v-for="(tileId, tileIdx) in layer.tileIds"
+            :key="tileId"
+            class="tile-item"
+            :class="{ active: selectedTileId === tileId }"
+            @click="selectTile(tileId)"
+            draggable="true"
+            @dragstart="(e) => handleTileDragStart(layer.name, tileId, e)"
+            @dragenter.prevent.stop="(e) => handleTileDragOver(e, layer.name, tileIdx)"
+            @dragover.prevent.stop="(e) => handleTileDragOver(e, layer.name, tileIdx)"
+            @dragend="handleTileDragEnd"
+          >
+            <!-- existing preview/buttons remain unchanged -->
             <div v-if="getTileById(tileId)">
               <img
                 v-if="getTileById(tileId).src"
@@ -914,6 +1036,11 @@ ul.layer-list {
       gap: 0.5rem;
       display: flex;
       flex-direction: column;
+
+      &.empty {
+        min-height: 2rem;
+        border: 1px dashed rgba(255, 255, 255, 0.2);
+      }
 
       li {
         background-color: variables.$light;
