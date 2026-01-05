@@ -127,8 +127,9 @@ const drawGrid = () => {
   ctx.strokeStyle = 'rgba(255,255,255,0.7)';
   ctx.lineWidth = 1;
 
-  const cellWidth = currentConfig.value.x * 2 * props.settings.camera.scale;
-  const cellHeight = currentConfig.value.y * 2 * props.settings.camera.scale;
+  const scale = props.settings.camera.scale;
+  const cellWidth = currentConfig.value.x * 2 * scale;
+  const cellHeight = currentConfig.value.y * 2 * scale;
 
   const worldCellWidth = currentConfig.value.x * 2;
   const worldCellHeight = currentConfig.value.y * 2;
@@ -136,20 +137,22 @@ const drawGrid = () => {
   const offsetX = ((props.settings.camera.x % worldCellWidth) + worldCellWidth) % worldCellWidth;
   const offsetY = ((props.settings.camera.y % worldCellHeight) + worldCellHeight) % worldCellHeight;
 
-  let x = -offsetX * props.settings.camera.scale;
+  let x = Math.floor(-offsetX * scale);
   while (x <= canvas.width) {
+    const gx = Math.floor(x) + 0.5;
     ctx.beginPath();
-    ctx.moveTo(Math.round(x), 0);
-    ctx.lineTo(Math.round(x), canvas.height);
+    ctx.moveTo(gx, 0);
+    ctx.lineTo(gx, canvas.height);
     ctx.stroke();
     x += cellWidth;
   }
 
-  let y = -offsetY * props.settings.camera.scale;
+  let y = Math.floor(-offsetY * scale);
   while (y <= canvas.height) {
+    const gy = Math.floor(y) + 0.5;
     ctx.beginPath();
-    ctx.moveTo(0, Math.round(y));
-    ctx.lineTo(canvas.width, Math.round(y));
+    ctx.moveTo(0, gy);
+    ctx.lineTo(canvas.width, gy);
     ctx.stroke();
     y += cellHeight;
   }
@@ -159,26 +162,29 @@ const drawPixels = () => {
   ctx.strokeStyle = 'rgba(255,255,255,0.1)';
   ctx.lineWidth = 1;
 
-  const step = 2 * props.settings.camera.scale;
+  const scale = props.settings.camera.scale;
+  const step = 2 * scale;
   const worldStep = 2;
 
   const offsetX = ((props.settings.camera.x % worldStep) + worldStep) % worldStep;
   const offsetY = ((props.settings.camera.y % worldStep) + worldStep) % worldStep;
 
-  let x = -offsetX * props.settings.camera.scale;
+  let x = Math.floor(-offsetX * scale);
   while (x <= canvas.width) {
+    const gx = Math.floor(x) + 0.5;
     ctx.beginPath();
-    ctx.moveTo(Math.round(x), 0);
-    ctx.lineTo(Math.round(x), canvas.height);
+    ctx.moveTo(gx, 0);
+    ctx.lineTo(gx, canvas.height);
     ctx.stroke();
     x += step;
   }
 
-  let y = -offsetY * props.settings.camera.scale;
+  let y = Math.floor(-offsetY * scale);
   while (y <= canvas.height) {
+    const gy = Math.floor(y) + 0.5;
     ctx.beginPath();
-    ctx.moveTo(0, Math.round(y));
-    ctx.lineTo(canvas.width, Math.round(y));
+    ctx.moveTo(0, gy);
+    ctx.lineTo(canvas.width, gy);
     ctx.stroke();
     y += step;
   }
