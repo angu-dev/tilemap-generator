@@ -313,6 +313,21 @@ const drawAllHitboxes = () => {
   }
 };
 
+const drawOrigin = () => {
+  const scale = props.settings.camera.scale;
+  const screenX = (0 - props.settings.camera.x) * scale;
+  const screenY = (0 - props.settings.camera.y) * scale;
+
+  ctx.save();
+  ctx.fillStyle = 'rgba(255, 165, 0, 1)';
+  const size = Math.max(10, 2 * scale);
+  ctx.fillRect(screenX - size / 2, screenY - size / 2, size, size);
+  ctx.strokeStyle = 'rgba(255, 255, 255, 1)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(screenX - size / 2, screenY - size / 2, size, size);
+  ctx.restore();
+};
+
 const render = () => {
   ctx.imageSmoothingEnabled = false;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -322,6 +337,8 @@ const render = () => {
 
   drawPlacedTiles();
   drawAllHitboxes();
+  drawOrigin();
+
   if (props.selectedTileId && !props.eraserActive) drawTilePreview();
   if (props.eraserActive) drawEraserCursor();
 };
