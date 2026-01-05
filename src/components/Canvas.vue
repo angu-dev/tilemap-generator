@@ -67,50 +67,44 @@ const drawTilePreview = () => {
   if (!tile || !tile.src || !mouseGridPos) return;
 
   const scale = props.settings.camera.scale;
-  const tileWidth = Math.round(tile.width * 2 * scale);
-  const tileHeight = Math.round(tile.height * 2 * scale);
+  const tileWidth = tile.width * 2 * scale;
+  const tileHeight = tile.height * 2 * scale;
 
-  const screenX = Math.floor((mouseGridPos.x - props.settings.camera.x) * scale);
-  const screenY = Math.floor((mouseGridPos.y - props.settings.camera.y) * scale);
+  const screenX = (mouseGridPos.x - props.settings.camera.x) * scale;
+  const screenY = (mouseGridPos.y - props.settings.camera.y) * scale;
 
-  const dx = Math.floor(-tileWidth / 2) - 0.5;
-  const dy = Math.floor(-tileHeight / 2) - 0.5;
-  const dw = tileWidth + 1;
-  const dh = tileHeight + 1;
+  const dx = -tileWidth / 2;
+  const dy = -tileHeight / 2;
+  const dw = tileWidth;
+  const dh = tileHeight;
 
   ctx.save();
-  const centerX = screenX + tileWidth / 2;
-  const centerY = screenY + tileHeight / 2;
-  ctx.translate(centerX, centerY);
+  ctx.translate(screenX + tileWidth / 2, screenY + tileHeight / 2);
 
   if (tile.rotation) ctx.rotate((tile.rotation * Math.PI) / 180);
   ctx.scale(tile.mirrored?.x ? -1 : 1, tile.mirrored?.y ? -1 : 1);
 
   const img = getOrLoadImage(tile.src);
-  if (img.complete) {
-    ctx.drawImage(img, dx, dy, dw, dh);
-  }
+  if (img.complete) ctx.drawImage(img, dx, dy, dw, dh);
 
   if (props.settings.showHitboxes && tile.hitboxes) {
     const cellW = dw / tile.width;
     const cellH = dh / tile.height;
-    const inset = 0.75; // reduziert Überschneidungen an den Kanten
+    const inset = Math.min(0.5, Math.min(cellW, cellH) * 0.2);
     ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
     tile.hitboxes.forEach((row, y) => {
       row.forEach((isHitbox, x) => {
         if (isHitbox) {
           const hx = dx + x * cellW;
           const hy = dy + y * cellH;
-          const w = Math.max(0, cellW - inset * 2);
-          const h = Math.max(0, cellH - inset * 2);
-          ctx.fillRect(hx + inset, hy + inset, w, h);
+          ctx.fillRect(hx + inset, hy + inset, cellW - inset * 2, cellH - inset * 2);
         }
       });
     });
   }
 
   ctx.strokeStyle = 'rgba(0, 150, 255, 0.8)';
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 1.5;
   ctx.strokeRect(dx, dy, dw, dh);
   ctx.restore();
 };
@@ -120,8 +114,8 @@ const resizeCanvas = () => {
   const { clientWidth, clientHeight } = canvasElem.value;
   canvas.width = Math.round(clientWidth * dpr);
   canvas.height = Math.round(clientHeight * dpr);
-  // zurück auf CSS-Size skalieren
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.lineWidth = 1;
   render();
 };
 
@@ -130,33 +124,26 @@ const drawGrid = () => {
   ctx.lineWidth = 1;
 
   const scale = props.settings.camera.scale;
-  const cellWidth = currentConfig.value.x * 2 * scale;
-  const cellHeight = currentConfig.value.y * 2 * scale;
+  const cellW = currentConfig.value.x * 2 * scale;
+  const cellH = currentConfig.value.y * 2 * scale;
 
-  const worldCellWidth = currentConfig.value.x * 2;
-  const worldCellHeight = currentConfig.value.y * 2;
+  const worldW = currentConfig.value.x * 2;
+  const worldH = currentConfig.value.y * 2;
 
-  const offsetX = ((props.settings.camera.x % worldCellWidth) + worldCellWidth) % worldCellWidth;
-  const offsetY = ((props.settings.camera.y % worldCellHeight) + worldCellHeight) % worldCellHeight;
+  const offX = ((props.settings.camera.x % worldW) + worldW) % worldW;
+  const offY = ((props.settings.camera.y % worldH) + worldH) % worldH;
 
-  let x = Math.floor(-offsetX * scale);
-  while (x <= canvas.width) {
-    const gx = Math.floor(x) + 0.5;
+  for (let x = -offX * scale; x <= canvas.width; x += cellW) {
     ctx.beginPath();
-    ctx.moveTo(gx, 0);
-    ctx.lineTo(gx, canvas.height);
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, canvas.height);
     ctx.stroke();
-    x += cellWidth;
   }
-
-  let y = Math.floor(-offsetY * scale);
-  while (y <= canvas.height) {
-    const gy = Math.floor(y) + 0.5;
+  for (let y = -offY * scale; y <= canvas.height; y += cellH) {
     ctx.beginPath();
-    ctx.moveTo(0, gy);
-    ctx.lineTo(canvas.width, gy);
+    ctx.moveTo(0, y);
+    ctx.lineTo(canvas.width, y);
     ctx.stroke();
-    y += cellHeight;
   }
 };
 
@@ -168,27 +155,20 @@ const drawPixels = () => {
   const step = 2 * scale;
   const worldStep = 2;
 
-  const offsetX = ((props.settings.camera.x % worldStep) + worldStep) % worldStep;
-  const offsetY = ((props.settings.camera.y % worldStep) + worldStep) % worldStep;
+  const offX = ((props.settings.camera.x % worldStep) + worldStep) % worldStep;
+  const offY = ((props.settings.camera.y % worldStep) + worldStep) % worldStep;
 
-  let x = Math.floor(-offsetX * scale);
-  while (x <= canvas.width) {
-    const gx = Math.floor(x) + 0.5;
+  for (let x = -offX * scale; x <= canvas.width; x += step) {
     ctx.beginPath();
-    ctx.moveTo(gx, 0);
-    ctx.lineTo(gx, canvas.height);
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, canvas.height);
     ctx.stroke();
-    x += step;
   }
-
-  let y = Math.floor(-offsetY * scale);
-  while (y <= canvas.height) {
-    const gy = Math.floor(y) + 0.5;
+  for (let y = -offY * scale; y <= canvas.height; y += step) {
     ctx.beginPath();
-    ctx.moveTo(0, gy);
-    ctx.lineTo(canvas.width, gy);
+    ctx.moveTo(0, y);
+    ctx.lineTo(canvas.width, y);
     ctx.stroke();
-    y += step;
   }
 };
 
@@ -208,22 +188,20 @@ const drawPlacedTiles = () => {
       const img = getOrLoadImage(tile.src);
       if (!img.complete) continue;
 
-      const tileWidth = Math.round(tile.width * 2 * scale);
-      const tileHeight = Math.round(tile.height * 2 * scale);
+      const tileWidth = tile.width * 2 * scale;
+      const tileHeight = tile.height * 2 * scale;
 
-      const dx = Math.floor(-tileWidth / 2) - 0.5;
-      const dy = Math.floor(-tileHeight / 2) - 0.5;
-      const dw = tileWidth + 1;
-      const dh = tileHeight + 1;
+      const dx = -tileWidth / 2;
+      const dy = -tileHeight / 2;
+      const dw = tileWidth;
+      const dh = tileHeight;
 
       tile.positions.forEach((pos) => {
-        const screenX = Math.floor((pos.x - props.settings.camera.x) * scale);
-        const screenY = Math.floor((pos.y - props.settings.camera.y) * scale);
+        const screenX = (pos.x - props.settings.camera.x) * scale;
+        const screenY = (pos.y - props.settings.camera.y) * scale;
 
         ctx.save();
-        const centerX = screenX + tileWidth / 2;
-        const centerY = screenY + tileHeight / 2;
-        ctx.translate(centerX, centerY);
+        ctx.translate(screenX + tileWidth / 2, screenY + tileHeight / 2);
 
         if (tile.rotation) ctx.rotate((tile.rotation * Math.PI) / 180);
         ctx.scale(tile.mirrored?.x ? -1 : 1, tile.mirrored?.y ? -1 : 1);
@@ -233,16 +211,14 @@ const drawPlacedTiles = () => {
         if (props.settings.showHitboxes && tile.hitboxes) {
           const cellW = dw / tile.width;
           const cellH = dh / tile.height;
-          const inset = 0.75; // reduziert Überschneidungen an den Kanten
+          const inset = Math.min(0.5, Math.min(cellW, cellH) * 0.2);
           ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
           tile.hitboxes.forEach((row, y) => {
             row.forEach((isHitbox, x) => {
               if (isHitbox) {
                 const hx = dx + x * cellW;
                 const hy = dy + y * cellH;
-                const w = Math.max(0, cellW - inset * 2);
-                const h = Math.max(0, cellH - inset * 2);
-                ctx.fillRect(hx + inset, hy + inset, w, h);
+                ctx.fillRect(hx + inset, hy + inset, cellW - inset * 2, cellH - inset * 2);
               }
             });
           });
