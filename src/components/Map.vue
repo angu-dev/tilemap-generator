@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, onUnmounted, reactive, ref, useTemplateRef } from 'vue';
+import { onMounted, onUnmounted, reactive, ref, useTemplateRef, watch } from 'vue';
 import Modal from './Modal.vue';
 import { useConfigStore } from '@/stores/configs';
 import { storeToRefs } from 'pinia';
@@ -34,6 +34,7 @@ const keys = reactive({
 });
 
 const showGenerationModal = ref(false);
+const eraserActive = ref(false);
 
 const formData = reactive({
   name: '',
@@ -243,6 +244,20 @@ const gameLoop = () => {
   animationFrameId = requestAnimationFrame(gameLoop);
 };
 
+watch(
+  () => eraserActive.value,
+  (on) => {
+    if (on) selectedTileId.value = null;
+  },
+);
+
+watch(
+  () => selectedTileId.value,
+  (val) => {
+    if (val !== null) eraserActive.value = false;
+  },
+);
+
 onMounted(() => {
   window.addEventListener('keydown', handleKeyDown);
   window.addEventListener('keyup', handleKeyUp);
@@ -275,6 +290,13 @@ onUnmounted(() => {
     <button v-if="!hasCurrentConfig" @click="openGenerationModal">Map erstellen</button>
 
     <template v-else>
+      <ul class="config tools">
+        <li>
+          <input type="checkbox" v-model="eraserActive" id="input-eraser" />
+          <label for="input-eraser">Radierer</label>
+        </li>
+      </ul>
+
       <ul class="config settings">
         <li>
           <input type="checkbox" v-model="settings.showGrid" id="input-show-grid" />
@@ -320,7 +342,7 @@ onUnmounted(() => {
         </li>
       </ul>
 
-      <Canvas :settings :selectedTileId />
+      <Canvas :settings :selectedTileId :eraserActive="eraserActive" />
     </template>
   </div>
 
@@ -381,6 +403,15 @@ onUnmounted(() => {
       padding-left: 2px;
       padding-top: 1px;
     }
+  }
+
+  .tools {
+    top: 0;
+    left: 0;
+    border-radius: 0 0 1rem 0;
+    border-top: none;
+    border-left: none;
+    color: variables.$light;
   }
 
   .settings {

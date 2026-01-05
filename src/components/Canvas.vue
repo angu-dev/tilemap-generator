@@ -7,7 +7,7 @@ const configs = useConfigStore();
 
 const { currentConfig } = storeToRefs(configs);
 
-const props = defineProps(['settings', 'selectedTileId']);
+const props = defineProps(['settings', 'selectedTileId', 'eraserActive']);
 
 const canvasElem = useTemplateRef('canvas-elem');
 
@@ -22,6 +22,7 @@ let lastDrawnPos = null;
 let paintMode = null;
 let isMouseOver = false;
 let dpr = window.devicePixelRatio || 1;
+let isErasing = false;
 
 const getGridPos = (clientX, clientY) => {
   const rect = canvasElem.value.getBoundingClientRect();
@@ -30,6 +31,11 @@ const getGridPos = (clientX, clientY) => {
 
   const relX = canvasX / props.settings.camera.scale + props.settings.camera.x;
   const relY = canvasY / props.settings.camera.scale + props.settings.camera.y;
+
+  if (props.eraserActive) {
+    // Nutze exakte Weltkoordinaten fürs Hit-Testing, aber merke Pixel für den Cursor
+    return { x: relX, y: relY, drawX: Math.floor(relX), drawY: Math.floor(relY) };
+  }
 
   const tile = currentConfig.value.tiles?.find((t) => t.id === props.selectedTileId);
   if (!tile) return null;
@@ -61,7 +67,49 @@ const getOrLoadImage = (src) => {
   return img;
 };
 
+const eraseAt = (point) => {
+  const cfg = currentConfig.value;
+  if (!cfg?.layers?.length || !cfg?.tiles?.length) return false;
+
+  for (let li = cfg.layers.length - 1; li >= 0; li--) {
+    const layer = cfg.layers[li];
+    if (layer.hidden || !layer.tileIds?.length) continue;
+
+    for (let ti = layer.tileIds.length - 1; ti >= 0; ti--) {
+      const tile = cfg.tiles.find((t) => t.id === layer.tileIds[ti]);
+      if (!tile || tile.hidden || !tile.positions?.length) continue;
+
+      const idx = tile.positions.findIndex((p) => point.x >= p.x && point.x < p.x + tile.width && point.y >= p.y && point.y < p.y + tile.height);
+
+      if (idx !== -1) {
+        tile.positions.splice(idx, 1);
+        configs.update();
+        return true;
+      }
+    }
+  }
+  return false;
+};
+
+const drawEraserCursor = () => {
+  if (!props.eraserActive || !isMouseOver || !mouseGridPos) return;
+  const scale = props.settings.camera.scale;
+  const size = 1 * scale;
+  const baseX = mouseGridPos.drawX ?? mouseGridPos.x;
+  const baseY = mouseGridPos.drawY ?? mouseGridPos.y;
+  const screenX = (baseX - props.settings.camera.x) * scale;
+  const screenY = (baseY - props.settings.camera.y) * scale;
+  ctx.save();
+  ctx.strokeStyle = 'rgba(150, 150, 255, 0.8)';
+  ctx.fillStyle = 'rgba(150, 150, 255, 0.15)';
+  ctx.lineWidth = 1;
+  ctx.fillRect(screenX, screenY, size, size);
+  ctx.strokeRect(screenX, screenY, size, size);
+  ctx.restore();
+};
+
 const drawTilePreview = () => {
+  if (props.eraserActive) return;
   if (!props.selectedTileId || !isMouseOver) return;
   const tile = currentConfig.value.tiles?.find((t) => t.id === props.selectedTileId);
   if (!tile || !tile.src || !mouseGridPos) return;
@@ -238,30 +286,42 @@ const render = () => {
   if (props.settings.showPixels) drawPixels();
 
   drawPlacedTiles();
-  if (props.selectedTileId) drawTilePreview();
+  if (props.selectedTileId && !props.eraserActive) drawTilePreview();
+  if (props.eraserActive) drawEraserCursor();
 };
 
 const handleCanvasMouseDown = (event) => {
-  if (!props.selectedTileId) return;
-  isDrawing = true;
+  if (!props.selectedTileId && !props.eraserActive) return;
+  isDrawing = false;
+  isErasing = false;
   lastDrawnPos = null;
   paintMode = null;
 
   const pos = getGridPos(event.clientX, event.clientY);
-  if (pos) {
-    const tile = currentConfig.value.tiles?.find((t) => t.id === props.selectedTileId);
-    if (tile) {
-      const existingIndex = tile.positions?.findIndex((p) => p.x === pos.x && p.y === pos.y) ?? -1;
-      paintMode = existingIndex !== -1 ? 'remove' : 'add';
-    }
+  if (!pos) return;
 
-    placeOrRemoveTile(pos);
-    lastDrawnPos = { x: pos.x, y: pos.y };
+  if (props.eraserActive) {
+    isErasing = true;
+    eraseAt(pos);
+    lastDrawnPos = { ...pos };
+    render();
+    return;
   }
+
+  isDrawing = true;
+  const tile = currentConfig.value.tiles?.find((t) => t.id === props.selectedTileId);
+  if (tile) {
+    const existingIndex = tile.positions?.findIndex((p) => p.x === pos.x && p.y === pos.y) ?? -1;
+    paintMode = existingIndex !== -1 ? 'remove' : 'add';
+  }
+
+  placeOrRemoveTile(pos);
+  lastDrawnPos = { x: pos.x, y: pos.y };
 };
 
 const handleCanvasMouseUp = () => {
   isDrawing = false;
+  isErasing = false;
   lastDrawnPos = null;
   paintMode = null;
 };
@@ -270,12 +330,17 @@ const handleCanvasMouseMove = (event) => {
   lastMouseEvent = event;
 
   const pos = getGridPos(event.clientX, event.clientY);
+  if (pos) mouseGridPos = pos;
 
-  if (pos) {
-    mouseGridPos = pos;
+  if (props.eraserActive && isErasing && pos) {
+    if (!lastDrawnPos || lastDrawnPos.x !== pos.x || lastDrawnPos.y !== pos.y) {
+      eraseAt(pos);
+      lastDrawnPos = { ...pos };
+    }
+    render();
+    return;
   }
 
-  // Wenn gedrückt und die Position hat sich geändert -> Tile platzieren
   if (isDrawing && props.selectedTileId && pos) {
     if (!lastDrawnPos || lastDrawnPos.x !== pos.x || lastDrawnPos.y !== pos.y) {
       placeOrRemoveTile(pos);
