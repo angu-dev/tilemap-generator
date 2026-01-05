@@ -256,21 +256,56 @@ const drawPlacedTiles = () => {
 
         ctx.drawImage(img, dx, dy, dw, dh);
 
-        if (props.settings.showHitboxes && tile.hitboxes) {
-          const cellW = dw / tile.width;
-          const cellH = dh / tile.height;
-          const inset = Math.min(0.5, Math.min(cellW, cellH) * 0.2);
-          ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
-          tile.hitboxes.forEach((row, y) => {
-            row.forEach((isHitbox, x) => {
-              if (isHitbox) {
-                const hx = dx + x * cellW;
-                const hy = dy + y * cellH;
-                ctx.fillRect(hx + inset, hy + inset, cellW - inset * 2, cellH - inset * 2);
-              }
-            });
+        ctx.restore();
+      });
+    }
+  }
+};
+
+const drawAllHitboxes = () => {
+  const cfg = currentConfig.value;
+  if (!cfg?.layers?.length || !cfg?.tiles?.length || !props.settings.showHitboxes) return;
+
+  const scale = props.settings.camera.scale;
+
+  for (const layer of cfg.layers) {
+    if (layer.hidden || !layer.tileIds?.length) continue;
+
+    for (const tileId of layer.tileIds) {
+      const tile = cfg.tiles.find((t) => t.id === tileId);
+      if (!tile || tile.hidden || !tile.hitboxes || !tile.positions?.length) continue;
+
+      const tileWidth = tile.width * scale;
+      const tileHeight = tile.height * scale;
+
+      const dx = -tileWidth / 2;
+      const dy = -tileHeight / 2;
+      const dw = tileWidth;
+      const dh = tileHeight;
+
+      tile.positions.forEach((pos) => {
+        const screenX = (pos.x - props.settings.camera.x) * scale;
+        const screenY = (pos.y - props.settings.camera.y) * scale;
+
+        ctx.save();
+        ctx.translate(screenX + tileWidth / 2, screenY + tileHeight / 2);
+
+        if (tile.rotation) ctx.rotate((tile.rotation * Math.PI) / 180);
+        ctx.scale(tile.mirrored?.x ? -1 : 1, tile.mirrored?.y ? -1 : 1);
+
+        const cellW = dw / tile.width;
+        const cellH = dh / tile.height;
+        const inset = Math.min(0.5, Math.min(cellW, cellH) * 0.2);
+        ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
+        tile.hitboxes.forEach((row, y) => {
+          row.forEach((isHitbox, x) => {
+            if (isHitbox) {
+              const hx = dx + x * cellW;
+              const hy = dy + y * cellH;
+              ctx.fillRect(hx + inset, hy + inset, cellW - inset * 2, cellH - inset * 2);
+            }
           });
-        }
+        });
 
         ctx.restore();
       });
@@ -286,6 +321,7 @@ const render = () => {
   if (props.settings.showPixels) drawPixels();
 
   drawPlacedTiles();
+  drawAllHitboxes();
   if (props.selectedTileId && !props.eraserActive) drawTilePreview();
   if (props.eraserActive) drawEraserCursor();
 };
