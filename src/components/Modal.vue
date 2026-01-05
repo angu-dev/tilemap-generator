@@ -21,6 +21,7 @@
   display: flex;
   justify-content: center;
   align-items: center;
+  z-index: 1;
 
   > div {
     background-color: variables.$dark;

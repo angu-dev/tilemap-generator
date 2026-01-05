@@ -59,6 +59,31 @@ let prevRotationEdit = 0;
 let isPainting = false;
 let paintMode = null;
 let editInitializing = false;
+let isPaintingEdit = false;
+let paintModeEdit = null;
+
+const handleCellDownEdit = (x, y, event) => {
+  if (event.button && event.button !== 0) return;
+
+  isPaintingEdit = true;
+  const row = editFormData.hitboxes[y];
+
+  if (row && typeof row[x] !== 'undefined') {
+    paintModeEdit = row[x] ? 'remove' : 'add';
+    row[x] = !row[x];
+  }
+
+  event.preventDefault();
+};
+
+const handleCellEnterEdit = (x, y) => {
+  if (!isPaintingEdit || !paintModeEdit) return;
+
+  const row = editFormData.hitboxes[y];
+  if (row && typeof row[x] !== 'undefined') {
+    row[x] = paintModeEdit === 'add';
+  }
+};
 
 const openCreateModal = () => {
   showCreateModal.value = true;
@@ -97,6 +122,20 @@ const toggleHiddenLayer = (layerName) => {
 const deleteLayer = (layerName) => {
   if (!confirm('Layer wirklich löschen?')) {
     return;
+  }
+
+  // Hole alle Tile-IDs aus dem Layer
+  const layer = currentConfig.value.layers.find((l) => l.name === layerName);
+  const tileIdsToDelete = layer?.tileIds || [];
+
+  // Lösche alle Tiles aus dem Layer
+  if (tileIdsToDelete.length > 0) {
+    currentConfig.value.tiles = currentConfig.value.tiles?.filter((t) => !tileIdsToDelete.includes(t.id)) || [];
+
+    // Deselektiere Tile falls es gelöscht wurde
+    if (tileIdsToDelete.includes(selectedTileId.value)) {
+      selectedTileId.value = null;
+    }
   }
 
   currentConfig.value.layers = currentConfig.value.layers.filter((layer) => layer.name !== layerName);
@@ -406,6 +445,8 @@ const handleCellEnter = (x, y) => {
 const handlePointerUpGlobal = () => {
   isPainting = false;
   paintMode = null;
+  isPaintingEdit = false;
+  paintModeEdit = null;
 };
 
 onMounted(() => {
@@ -604,7 +645,20 @@ watch(
         <ul v-if="layer.tileIds" class="tiles-list">
           <li v-for="tileId in layer.tileIds" :key="tileId" class="tile-item" :class="{ active: selectedTileId === tileId }" @click="selectTile(tileId)">
             <div v-if="getTileById(tileId)">
-              <img v-if="getTileById(tileId).src" :src="getTileById(tileId).src" alt="tile preview" class="tile-preview" />
+              <img
+                v-if="getTileById(tileId).src"
+                :src="getTileById(tileId).src"
+                alt="tile preview"
+                class="tile-preview"
+                :style="{
+                  transform: `
+                    scaleX(${getTileById(tileId).mirrored?.x ? -1 : 1})
+                    scaleY(${getTileById(tileId).mirrored?.y ? -1 : 1})
+                    rotate(${normRot(getTileById(tileId).rotation || 0)}deg)
+                  `,
+                  transformOrigin: 'center center',
+                }"
+              />
               {{ getTileById(tileId).fileName }}
             </div>
 
@@ -634,16 +688,16 @@ watch(
   </Modal>
 
   <Modal v-if="showRenameModal">
-    <h2>Layer umbenennen</h2>
+    <h2>Layer bearbeiten</h2>
 
     <form @submit.prevent="handleRenameForm">
       <div class="input-wrapper">
-        <label for="input-name">Neuer Name:</label>
+        <label for="input-name">Name:</label>
         <input type="text" id="input-name" v-model="renameFormData.name" required />
       </div>
 
       <button type="button" @click="closeRenameModal">Abbrechen</button>
-      <button type="submit" :disabled="!renameFormData.name">Umbenenen</button>
+      <button type="submit" :disabled="!renameFormData.name">Bearbeiten</button>
     </form>
   </Modal>
 
@@ -777,9 +831,9 @@ watch(
                 :key="`c-${y}-${x}`"
                 class="cell"
                 :class="{ active: cell }"
-                @pointerdown="(e) => handleCellDown(x, y, e)"
-                @pointerenter="() => handleCellEnter(x, y)"
-              />
+                @pointerdown="(e) => handleCellDownEdit(x, y, e)"
+                @pointerenter="() => handleCellEnterEdit(x, y)"
+              ></div>
             </template>
           </div>
         </div>
@@ -868,6 +922,8 @@ ul.layer-list {
         display: flex;
         justify-content: space-between;
         align-items: center;
+        cursor: move;
+        user-select: none;
 
         &.active {
           background-color: rgba(0, 150, 255, 0.7);
