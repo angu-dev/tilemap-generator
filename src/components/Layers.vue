@@ -2,7 +2,7 @@
 import { useConfigStore } from '@/stores/configs';
 import { storeToRefs } from 'pinia';
 import Modal from './Modal.vue';
-import { onMounted, onUnmounted, reactive, ref, watch } from 'vue';
+import { onMounted, onUnmounted, reactive, ref, watch, nextTick } from 'vue';
 
 const configs = useConfigStore();
 
@@ -30,9 +30,24 @@ const addTileFormData = reactive({
   },
 });
 
+const editFormData = reactive({
+  tileId: null,
+  layerName: null,
+  snapGrid: true,
+  width: 16,
+  height: 16,
+  hitboxes: [],
+  rotation: 0,
+  mirrored: {
+    x: false,
+    y: false,
+  },
+});
+
 const showCreateModal = ref(false);
 const showRenameModal = ref(false);
 const showAddTileModal = ref(false);
+const showEditTileModal = ref(false);
 const previewUrl = ref(null);
 const selectedLayerName = ref(null);
 
@@ -40,8 +55,10 @@ let draggedLayerName = null;
 let draggedIndex = null;
 let targetIndex = null;
 let prevRotation = 0;
+let prevRotationEdit = 0;
 let isPainting = false;
 let paintMode = null;
+let editInitializing = false;
 
 const openCreateModal = () => {
   showCreateModal.value = true;
@@ -218,9 +235,9 @@ const handleAddTileForm = async () => {
     rotation: normRot(addTileFormData.rotation),
     mirrored: { ...addTileFormData.mirrored },
     hitboxes: baseHitboxes,
-
     fileName: addTileFormData.file.name,
     src: dataUrl,
+    hidden: false,
   };
 
   if (!currentConfig.value.tiles) currentConfig.value.tiles = [];
@@ -229,6 +246,13 @@ const handleAddTileForm = async () => {
 
   configs.update();
   closeAddTileModal();
+};
+
+const toggleTileHidden = (layerName, tileId) => {
+  const tile = getTileById(tileId);
+  if (!tile) return;
+  tile.hidden = !tile.hidden;
+  configs.update();
 };
 
 const handleSnapGridChange = () => {
@@ -400,6 +424,84 @@ const selectTile = (tileId) => {
   selectedTileId.value = selectedTileId.value === tileId ? null : tileId;
 };
 
+const editTile = async (layerName, tileId) => {
+  const tile = getTileById(tileId);
+  if (!tile) return;
+
+  // Guard an: Watcher sollen während Initialisierung nicht reagieren
+  editInitializing = true;
+
+  editFormData.tileId = tileId;
+  editFormData.layerName = layerName;
+  editFormData.snapGrid = tile.snapGrid;
+  editFormData.width = tile.width;
+  editFormData.height = tile.height;
+
+  // Transformiere Base-Hitboxes vorwärts (für Anzeige)
+  let displayHitboxes = tile.hitboxes.map((r) => [...r]);
+
+  const rotSteps = Math.round(normRot(tile.rotation || 0) / 90) % 4;
+  for (let i = 0; i < rotSteps; i++) {
+    const old = displayHitboxes;
+    const h = old.length;
+    const w = h ? old[0].length : 0;
+    const rotated = Array.from({ length: w }, () => Array.from({ length: h }, () => false));
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        rotated[x][h - 1 - y] = old[y][x];
+      }
+    }
+    displayHitboxes = rotated;
+  }
+
+  if (tile.mirrored?.x) displayHitboxes = displayHitboxes.map((row) => [...row].reverse());
+  if (tile.mirrored?.y) displayHitboxes = [...displayHitboxes].reverse();
+
+  // Setze die transformierten Hitboxes und die sichtbaren Werte
+  editFormData.hitboxes = displayHitboxes;
+  prevRotationEdit = tile.rotation || 0;
+  editFormData.rotation = tile.rotation || 0;
+  editFormData.mirrored = { ...(tile.mirrored || { x: false, y: false }) };
+
+  showEditTileModal.value = true;
+
+  // Warte einen Tick, damit alle reaktiven Updates durch sind, dann Watcher freigeben
+  await nextTick();
+  editInitializing = false;
+};
+
+const closeEditTileModal = () => {
+  showEditTileModal.value = false;
+  editFormData.tileId = null;
+  editFormData.layerName = null;
+  prevRotationEdit = 0;
+};
+
+const handleEditTileForm = () => {
+  const tile = getTileById(editFormData.tileId);
+  if (!tile) return;
+
+  let baseHitboxes = editFormData.hitboxes.map((r) => [...r]);
+  let baseRotation = normRot(editFormData.rotation);
+  let baseMirrored = { ...editFormData.mirrored };
+
+  const stepsBack = Math.round(baseRotation / 90);
+  for (let i = 0; i < stepsBack; i++) {
+    baseHitboxes = rotateHitboxesCCW(baseHitboxes);
+  }
+
+  if (baseMirrored.x) baseHitboxes = baseHitboxes.map((row) => [...row].reverse());
+  if (baseMirrored.y) baseHitboxes = [...baseHitboxes].reverse();
+
+  // Don't overwrite tile.width/height/snapGrid here — they must stay as originally set
+  tile.hitboxes = baseHitboxes;
+  tile.rotation = normRot(editFormData.rotation);
+  tile.mirrored = { ...editFormData.mirrored };
+
+  configs.update();
+  closeEditTileModal();
+};
+
 const deleteTile = (layerName, tileId) => {
   if (!confirm('Tile wirklich löschen?')) {
     return;
@@ -418,6 +520,58 @@ const deleteTile = (layerName, tileId) => {
 
   configs.update();
 };
+
+watch(
+  () => editFormData.rotation,
+  (rot) => {
+    if (editInitializing) return; // neu
+    const oldR = normRot(prevRotationEdit);
+    const newR = normRot(rot);
+
+    let steps = Math.round((newR - oldR) / 90);
+    steps = ((steps % 4) + 4) % 4;
+
+    for (let i = 0; i < steps; i++) {
+      const old = editFormData.hitboxes || [];
+      const h = old.length;
+      const w = h ? old[0].length : 0;
+      const rotated = Array.from({ length: w }, () => Array.from({ length: h }, () => false));
+
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          rotated[x][h - 1 - y] = old[y][x];
+        }
+      }
+
+      editFormData.hitboxes = rotated;
+      const tmp = editFormData.width;
+      editFormData.width = editFormData.height;
+      editFormData.height = tmp;
+    }
+
+    prevRotationEdit = rot;
+  },
+);
+
+watch(
+  () => editFormData.mirrored.x,
+  () => {
+    if (editInitializing) return; // neu
+    if (editFormData.hitboxes.length) {
+      editFormData.hitboxes = editFormData.hitboxes.map((row) => [...row].reverse());
+    }
+  },
+);
+
+watch(
+  () => editFormData.mirrored.y,
+  () => {
+    if (editInitializing) return; // neu
+    if (editFormData.hitboxes.length) {
+      editFormData.hitboxes = [...editFormData.hitboxes].reverse();
+    }
+  },
+);
 </script>
 
 <template>
@@ -441,7 +595,7 @@ const deleteTile = (layerName, tileId) => {
 
           <div>
             <button @click="openAddTileModal(layer.name)">+</button>
-            <button @click="openRenameModal(layer.name)">U</button>
+            <button @click="openRenameModal(layer.name)">E</button>
             <button @click="toggleHiddenLayer(layer.name)">{{ layer.hidden ? 'S' : 'H' }}</button>
             <button @click="deleteLayer(layer.name)">D</button>
           </div>
@@ -455,6 +609,8 @@ const deleteTile = (layerName, tileId) => {
             </div>
 
             <div>
+              <button @click="editTile(layer.name, tileId)">E</button>
+              <button @click.stop="toggleTileHidden(layer.name, tileId)">{{ getTileById(tileId)?.hidden ? 'S' : 'H' }}</button>
               <button @click="deleteTile(layer.name, tileId)">D</button>
             </div>
           </li>
@@ -582,6 +738,81 @@ const deleteTile = (layerName, tileId) => {
 
       <button type="button" @click="closeAddTileModal">Abbrechen</button>
       <button type="submit" :disabled="!addTileFormData.file">Hinzufügen</button>
+    </form>
+  </Modal>
+
+  <Modal v-if="showEditTileModal">
+    <h2>Tile bearbeiten</h2>
+
+    <form @submit.prevent="handleEditTileForm">
+      <template v-if="getTileById(editFormData.tileId)">
+        <div
+          class="tile-grid"
+          :style="{
+            aspectRatio: `${editFormData.width} / ${editFormData.height}`,
+          }"
+        >
+          <div
+            class="background"
+            :style="{
+              backgroundImage: `url(${getTileById(editFormData.tileId).src})`,
+              transform: `
+                scaleX(${editFormData.mirrored.x ? -1 : 1})
+                scaleY(${editFormData.mirrored.y ? -1 : 1})
+                rotate(${normRot(editFormData.rotation)}deg)
+              `,
+            }"
+          ></div>
+
+          <div
+            class="overlay"
+            :style="{
+              gridTemplateColumns: `repeat(${editFormData.width}, 1fr)`,
+              gridTemplateRows: `repeat(${editFormData.height}, 1fr)`,
+            }"
+          >
+            <template v-for="(row, y) in editFormData.hitboxes" :key="`r-${y}`">
+              <div
+                v-for="(cell, x) in row"
+                :key="`c-${y}-${x}`"
+                class="cell"
+                :class="{ active: cell }"
+                @pointerdown="(e) => handleCellDown(x, y, e)"
+                @pointerenter="() => handleCellEnter(x, y)"
+              />
+            </template>
+          </div>
+        </div>
+
+        <div class="input-wrapper rotation">
+          <label>Rotation:</label>
+
+          <label for="input-rotation-0-edit">0</label>
+          <input type="radio" id="input-rotation-0-edit" value="0" v-model="editFormData.rotation" />
+
+          <label for="input-rotation-90-edit">90</label>
+          <input type="radio" id="input-rotation-90-edit" value="90" v-model="editFormData.rotation" />
+
+          <label for="input-rotation-180-edit">180</label>
+          <input type="radio" id="input-rotation-180-edit" value="180" v-model="editFormData.rotation" />
+
+          <label for="input-rotation-270-edit">270</label>
+          <input type="radio" id="input-rotation-270-edit" value="270" v-model="editFormData.rotation" />
+        </div>
+
+        <div class="input-wrapper">
+          <label for="input-mirrored-x-edit">Gespiegelt X:</label>
+          <input type="checkbox" id="input-mirrored-x-edit" v-model="editFormData.mirrored.x" />
+        </div>
+
+        <div class="input-wrapper">
+          <label for="input-mirrored-y-edit">Gespiegelt Y:</label>
+          <input type="checkbox" id="input-mirrored-y-edit" v-model="editFormData.mirrored.y" />
+        </div>
+      </template>
+
+      <button type="button" @click="closeEditTileModal">Abbrechen</button>
+      <button type="submit">Bearbeiten</button>
     </form>
   </Modal>
 </template>

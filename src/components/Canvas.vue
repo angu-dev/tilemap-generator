@@ -195,6 +195,14 @@ const drawPlacedTiles = () => {
   currentConfig.value.tiles.forEach((tile) => {
     if (!tile.src || !tile.positions || tile.positions.length === 0) return;
 
+    // Skip wenn das Tile selbst hidden ist
+    if (tile.hidden) return;
+
+    // Prüfe ob der Tile in einem hidden Layer ist
+    const tileLayer = currentConfig.value.layers?.find((layer) => layer.tileIds?.includes(tile.id));
+
+    if (tileLayer?.hidden) return; // Skip wenn Layer hidden ist
+
     const img = getOrLoadImage(tile.src);
     if (!img.complete) return;
 
