@@ -7,7 +7,9 @@ const configs = useConfigStore();
 
 const { currentConfig } = storeToRefs(configs);
 
-const props = defineProps(['settings', 'selectedTileId', 'eraserActive']);
+const props = defineProps(['settings', 'selectedTileId', 'eraserActive', 'originMoveActive']);
+
+const emit = defineEmits(['deactivateOriginMove']);
 
 const canvasElem = useTemplateRef('canvas-elem');
 
@@ -35,6 +37,15 @@ const getGridPos = (clientX, clientY) => {
   if (props.eraserActive) {
     // Nutze exakte Weltkoordinaten fürs Hit-Testing, aber merke Pixel für den Cursor
     return { x: relX, y: relY, drawX: Math.floor(relX), drawY: Math.floor(relY) };
+  }
+
+  if (props.originMoveActive) {
+    const stepX = currentConfig.value.x;
+    const stepY = currentConfig.value.y;
+    return {
+      x: Math.floor(relX / stepX) * stepX,
+      y: Math.floor(relY / stepY) * stepY,
+    };
   }
 
   const tile = currentConfig.value.tiles?.find((t) => t.id === props.selectedTileId);
@@ -313,6 +324,47 @@ const drawAllHitboxes = () => {
   }
 };
 
+const moveOrigin = (newOrigin) => {
+  const cfg = currentConfig.value;
+  if (!cfg?.tiles?.length) return;
+
+  const offsetX = -newOrigin.x;
+  const offsetY = -newOrigin.y;
+
+  // Verschiebe alle Tile-Positionen
+  cfg.tiles.forEach((tile) => {
+    if (tile.positions) {
+      tile.positions.forEach((pos) => {
+        pos.x += offsetX;
+        pos.y += offsetY;
+      });
+    }
+  });
+
+  // Verschiebe auch die Kamera
+  props.settings.camera.x += offsetX;
+  props.settings.camera.y += offsetY;
+
+  configs.update();
+  render();
+};
+
+const drawOriginMoveCursor = () => {
+  if (!props.originMoveActive || !isMouseOver || !mouseGridPos) return;
+  const scale = props.settings.camera.scale;
+  const size = Math.max(10, 2 * scale);
+  const screenX = (mouseGridPos.x - props.settings.camera.x) * scale;
+  const screenY = (mouseGridPos.y - props.settings.camera.y) * scale;
+
+  ctx.save();
+  ctx.fillStyle = 'rgba(255, 165, 0, 0.4)';
+  ctx.fillRect(screenX - size / 2, screenY - size / 2, size, size);
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(screenX - size / 2, screenY - size / 2, size, size);
+  ctx.restore();
+};
+
 const drawOrigin = () => {
   const scale = props.settings.camera.scale;
   const screenX = (0 - props.settings.camera.x) * scale;
@@ -341,10 +393,12 @@ const render = () => {
 
   if (props.selectedTileId && !props.eraserActive) drawTilePreview();
   if (props.eraserActive) drawEraserCursor();
+  if (props.originMoveActive) drawOriginMoveCursor();
 };
 
 const handleCanvasMouseDown = (event) => {
-  if (!props.selectedTileId && !props.eraserActive) return;
+  if (!props.selectedTileId && !props.eraserActive && !props.originMoveActive) return;
+
   isDrawing = false;
   isErasing = false;
   lastDrawnPos = null;
@@ -352,6 +406,12 @@ const handleCanvasMouseDown = (event) => {
 
   const pos = getGridPos(event.clientX, event.clientY);
   if (!pos) return;
+
+  if (props.originMoveActive) {
+    moveOrigin(pos);
+    emit('deactivateOriginMove');
+    return;
+  }
 
   if (props.eraserActive) {
     isErasing = true;
@@ -384,6 +444,11 @@ const handleCanvasMouseMove = (event) => {
 
   const pos = getGridPos(event.clientX, event.clientY);
   if (pos) mouseGridPos = pos;
+
+  if (props.originMoveActive) {
+    render();
+    return;
+  }
 
   if (props.eraserActive && isErasing && pos) {
     if (!lastDrawnPos || lastDrawnPos.x !== pos.x || lastDrawnPos.y !== pos.y) {
@@ -462,6 +527,10 @@ onMounted(() => {
   ctx = canvas.getContext('2d');
 
   resizeCanvas();
+
+  const { clientWidth, clientHeight } = canvasElem.value;
+  props.settings.camera.x = -clientWidth / (2 * props.settings.camera.scale);
+  props.settings.camera.y = -clientHeight / (2 * props.settings.camera.scale);
 
   window.addEventListener('resize', resizeCanvas);
   canvas.addEventListener('mousedown', handleCanvasMouseDown);

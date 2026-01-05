@@ -35,6 +35,7 @@ const keys = reactive({
 
 const showGenerationModal = ref(false);
 const eraserActive = ref(false);
+const originMoveActive = ref(false);
 
 const formData = reactive({
   name: '',
@@ -247,14 +248,30 @@ const gameLoop = () => {
 watch(
   () => eraserActive.value,
   (on) => {
-    if (on) selectedTileId.value = null;
+    if (on) {
+      selectedTileId.value = null;
+      originMoveActive.value = false;
+    }
   },
 );
 
 watch(
   () => selectedTileId.value,
   (val) => {
-    if (val !== null) eraserActive.value = false;
+    if (val !== null) {
+      eraserActive.value = false;
+      originMoveActive.value = false;
+    }
+  },
+);
+
+watch(
+  () => originMoveActive.value,
+  (on) => {
+    if (on) {
+      selectedTileId.value = null;
+      eraserActive.value = false;
+    }
   },
 );
 
@@ -294,6 +311,11 @@ onUnmounted(() => {
         <li>
           <input type="checkbox" v-model="eraserActive" id="input-eraser" />
           <label for="input-eraser">Radierer</label>
+        </li>
+
+        <li>
+          <input type="checkbox" v-model="originMoveActive" id="input-origin-move" />
+          <label for="input-origin-move">0-Punkt verschieben</label>
         </li>
       </ul>
 
@@ -342,7 +364,13 @@ onUnmounted(() => {
         </li>
       </ul>
 
-      <Canvas :settings :selectedTileId :eraserActive="eraserActive" />
+      <Canvas
+        :settings
+        :selectedTileId
+        :eraserActive="eraserActive"
+        :originMoveActive="originMoveActive"
+        @deactivateOriginMove="() => (originMoveActive = false)"
+      />
     </template>
   </div>
 
