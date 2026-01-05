@@ -35,16 +35,16 @@ const getGridPos = (clientX, clientY) => {
   if (!tile) return null;
 
   if (tile.snapGrid) {
-    const stepX = currentConfig.value.x * 2;
-    const stepY = currentConfig.value.y * 2;
+    const stepX = currentConfig.value.x;
+    const stepY = currentConfig.value.y;
     return {
       x: Math.floor(relX / stepX) * stepX,
       y: Math.floor(relY / stepY) * stepY,
     };
   } else {
     return {
-      x: Math.round(relX / 2) * 2,
-      y: Math.round(relY / 2) * 2,
+      x: Math.round(relX),
+      y: Math.round(relY),
     };
   }
 };
@@ -67,8 +67,8 @@ const drawTilePreview = () => {
   if (!tile || !tile.src || !mouseGridPos) return;
 
   const scale = props.settings.camera.scale;
-  const tileWidth = tile.width * 2 * scale;
-  const tileHeight = tile.height * 2 * scale;
+  const tileWidth = tile.width * scale;
+  const tileHeight = tile.height * scale;
 
   const screenX = (mouseGridPos.x - props.settings.camera.x) * scale;
   const screenY = (mouseGridPos.y - props.settings.camera.y) * scale;
@@ -124,11 +124,11 @@ const drawGrid = () => {
   ctx.lineWidth = 1;
 
   const scale = props.settings.camera.scale;
-  const cellW = currentConfig.value.x * 2 * scale;
-  const cellH = currentConfig.value.y * 2 * scale;
+  const cellW = currentConfig.value.x * scale;
+  const cellH = currentConfig.value.y * scale;
 
-  const worldW = currentConfig.value.x * 2;
-  const worldH = currentConfig.value.y * 2;
+  const worldW = currentConfig.value.x;
+  const worldH = currentConfig.value.y;
 
   const offX = ((props.settings.camera.x % worldW) + worldW) % worldW;
   const offY = ((props.settings.camera.y % worldH) + worldH) % worldH;
@@ -142,7 +142,7 @@ const drawGrid = () => {
   for (let y = -offY * scale; y <= canvas.height; y += cellH) {
     ctx.beginPath();
     ctx.moveTo(0, y);
-    ctx.lineTo(canvas.width, y);
+    ctx.lineTo(0 + canvas.width, y);
     ctx.stroke();
   }
 };
@@ -152,8 +152,8 @@ const drawPixels = () => {
   ctx.lineWidth = 1;
 
   const scale = props.settings.camera.scale;
-  const step = 2 * scale;
-  const worldStep = 2;
+  const step = 1 * scale;
+  const worldStep = 1;
 
   const offX = ((props.settings.camera.x % worldStep) + worldStep) % worldStep;
   const offY = ((props.settings.camera.y % worldStep) + worldStep) % worldStep;
@@ -188,8 +188,8 @@ const drawPlacedTiles = () => {
       const img = getOrLoadImage(tile.src);
       if (!img.complete) continue;
 
-      const tileWidth = tile.width * 2 * scale;
-      const tileHeight = tile.height * 2 * scale;
+      const tileWidth = tile.width * scale;
+      const tileHeight = tile.height * scale;
 
       const dx = -tileWidth / 2;
       const dy = -tileHeight / 2;

@@ -20,7 +20,7 @@ const settings = reactive({
   camera: {
     x: 0,
     y: 0,
-    scale: 1,
+    scale: 2,
   },
 });
 
@@ -220,7 +220,7 @@ const handlePointerMove = (event) => {
   const dx = event.clientX - lastPointer.x;
   const dy = event.clientY - lastPointer.y;
 
-  const scale = settings.camera.scale || 1;
+  const scale = settings.camera.scale || 2;
   settings.camera.x -= dx / scale;
   settings.camera.y -= dy / scale;
 

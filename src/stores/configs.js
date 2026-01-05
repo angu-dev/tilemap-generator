@@ -78,6 +78,8 @@ export const useConfigStore = defineStore('config', () => {
   const currentConfig = computed(() => {
     if (!hasCurrentConfig) return null;
 
+    console.log(configs.filter((config) => config.name === currentConfigName.value)[0]);
+
     return configs.filter((config) => config.name === currentConfigName.value)[0];
   });
 
