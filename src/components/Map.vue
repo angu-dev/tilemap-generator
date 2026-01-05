@@ -87,11 +87,14 @@ const updateCamera = () => {
     const factor = keys.plus ? 1.01 : 0.99;
     const newScale = Math.min(10, Math.max(1, oldScale * factor));
 
-    const f = newScale / oldScale;
-    settings.camera.x = settings.camera.x * f + centerX * (f - 1);
-    settings.camera.y = settings.camera.y * f + centerY * (f - 1);
+    if (Math.abs(newScale - oldScale) > 1e-9) {
+      const worldCx = settings.camera.x + centerX / oldScale;
+      const worldCy = settings.camera.y + centerY / oldScale;
 
-    settings.camera.scale = newScale;
+      settings.camera.scale = newScale;
+      settings.camera.x = worldCx - centerX / newScale;
+      settings.camera.y = worldCy - centerY / newScale;
+    }
   }
 };
 
